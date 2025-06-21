@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 
 function QuizPage({ user, token }) {
   const [question, setQuestion] = useState(null);
@@ -12,6 +12,7 @@ function QuizPage({ user, token }) {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [questionCount, setQuestionCount] = useState(0);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const prevCurrentQuestion = useRef(null);
 
   // Проверяем аутентификацию
   useEffect(() => {
@@ -51,43 +52,88 @@ function QuizPage({ user, token }) {
   };
 
   useEffect(() => {
-    let ws = new WebSocket('ws://localhost:8000/ws/room');
+    let ws = null;
+    let wsConnected = false;
     
-    ws.onopen = () => {
-      console.log('WebSocket connected in QuizPage');
-    };
-    
-    ws.onmessage = (e) => {
+    const connectWebSocket = () => {
       try {
-        const data = JSON.parse(e.data);
-        setTimer(data.timer);
-        setCurrentQuestion(data.current_question || 0);
-        setQuestionCount(data.question_count || 0);
+        const wsProtocol = window.location.protocol === "https:" ? "wss" : "ws";
+        const wsHost = window.location.host;
+        const wsUrl = `${wsProtocol}://${wsHost}/ws/room`;
+        console.log('Attempting WebSocket connection in QuizPage to', wsUrl);
+        ws = new WebSocket(wsUrl);
         
-        // Если стадия изменилась на quiz, обновляем вопрос
-        if (data.stage === 'quiz') {
-          fetchQuestion();
-        }
+        ws.onopen = () => {
+          console.log('✅ WebSocket connected in QuizPage');
+          wsConnected = true;
+        };
         
-        // Если стадия изменилась на pause, показываем результаты
-        if (data.stage === 'pause') {
-          setShowResult(true);
-          fetchResults();
-        }
+        ws.onmessage = (e) => {
+          try {
+            const data = JSON.parse(e.data);
+            console.log('📨 WebSocket message in QuizPage:', data);
+            setTimer(data.timer);
+            setQuestionCount(data.question_count || 0);
+            // Если номер вопроса изменился — обновляем вопрос
+            if (data.current_question !== prevCurrentQuestion.current) {
+              setCurrentQuestion(data.current_question || 0);
+              prevCurrentQuestion.current = data.current_question;
+              fetchQuestion();
+            }
+            // Если стадия изменилась на pause, показываем результаты
+            if (data.stage === 'pause') {
+              setShowResult(true);
+              fetchResults();
+            }
+          } catch (error) {
+            console.error('❌ WebSocket message error in QuizPage:', error);
+          }
+        };
+        
+        ws.onerror = (error) => {
+          console.error('❌ WebSocket error in QuizPage:', error);
+          wsConnected = false;
+        };
+        
+        ws.onclose = (event) => {
+          console.log('🔌 WebSocket disconnected in QuizPage. Code:', event.code, 'Reason:', event.reason);
+          wsConnected = false;
+          setTimeout(connectWebSocket, 5000);
+        };
       } catch (error) {
-        console.error('WebSocket message error:', error);
+        console.error('❌ Failed to create WebSocket in QuizPage:', error);
+        wsConnected = false;
       }
     };
     
-    ws.onerror = (error) => {
-      console.error('WebSocket error in QuizPage:', error);
-    };
+    connectWebSocket();
     
-    ws.onclose = () => {
-      console.log('WebSocket disconnected in QuizPage');
-    };
+    // Fallback: если WebSocket не работает, используем API polling каждые 5 секунд
+    const fallbackInterval = setInterval(() => {
+      if (!wsConnected) {
+        fetch('/api/room')
+          .then(res => res.json())
+          .then(data => {
+            setTimer(data.timer);
+            setQuestionCount(data.question_count || 0);
+            if (data.current_question !== prevCurrentQuestion.current) {
+              setCurrentQuestion(data.current_question || 0);
+              prevCurrentQuestion.current = data.current_question;
+              fetchQuestion();
+            }
+          })
+          .catch(error => {
+            console.error('❌ API fallback error:', error);
+          });
+      }
+    }, 5000);
     
-    return () => ws.close();
+    return () => {
+      if (ws) {
+        ws.close();
+      }
+      clearInterval(fallbackInterval);
+    };
   }, [user]);
 
   // Получаем первый вопрос при загрузке
@@ -131,17 +177,17 @@ function QuizPage({ user, token }) {
     }
   };
 
-  if (!question || !question.text)
+  if (!question || !question.text || questionCount === 0)
     return (
       <div style={{ maxWidth: 480, margin: '40px auto', fontFamily: 'sans-serif', fontSize: 22, textAlign: 'center' }}>
-        Ожидание вопроса...
+        Ожидание начала викторины...
       </div>
     );
 
   return (
     <div style={{ maxWidth: 480, margin: '40px auto', fontFamily: 'sans-serif' }}>
       <div style={{ fontSize: 16, color: '#888', marginBottom: 8 }}>
-        Вопрос {currentQuestion + 1} из {questionCount}
+        {questionCount > 0 ? `Вопрос ${currentQuestion + 1} из ${questionCount}` : 'Ожидание начала викторины...'}
       </div>
       <div style={{ fontSize: 18, color: '#888', marginBottom: 8 }}>{question.theme}</div>
       <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 16 }}>{question.text}</div>

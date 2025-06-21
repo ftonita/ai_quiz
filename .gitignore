@@ -1,0 +1,60 @@
+# Environment variables
+.env
+.env.local
+.env.production
+.env.development
+
+# Secrets and credentials
+secrets/
+credentials/
+*.key
+*.pem
+*.crt
+
+# Logs
+*.log
+logs/
+
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker
+.dockerignore
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Backup files
+*.bak
+*.backup
+
+# Local configuration
+config.local.js
+config.local.json 

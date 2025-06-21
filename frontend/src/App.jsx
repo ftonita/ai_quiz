@@ -4,6 +4,7 @@ import RoomPage from './RoomPage';
 import RegisterPage from './RegisterPage';
 import QuizPage from './QuizPage';
 import ResultsPage from './ResultsPage';
+import DuckBackground from './DuckBackground';
 
 // Компонент для автоматического перенаправления
 function AutoRedirect({ user, roomStage, isLoading }) {
@@ -134,6 +135,7 @@ function App() {
   return (
     <Router>
       <div className="App">
+        <DuckBackground />
         <AutoRedirect user={user} roomStage={roomStage} isLoading={isLoading} />
         <Routes>
           <Route path="/" element={<Navigate to="/room" replace />} />

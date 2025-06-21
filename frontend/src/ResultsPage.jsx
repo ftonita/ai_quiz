@@ -18,9 +18,10 @@ function ResultsPage() {
   useEffect(() => {
     // Получаем результаты сразу
     fetchResults();
-    
-    // Подключаем WebSocket для обновлений
-    const ws = new WebSocket('ws://localhost:8000/ws/room');
+    const wsProtocol = window.location.protocol === "https:" ? "wss" : "ws";
+    const wsHost = window.location.host;
+    const wsUrl = `${wsProtocol}://${wsHost}/ws/room`;
+    const ws = new WebSocket(wsUrl);
     
     ws.onopen = () => {
       console.log('WebSocket connected in ResultsPage');

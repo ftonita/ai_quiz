@@ -25,40 +25,65 @@ function RoomPage({ user, token, onLogout }) {
     fetchData();
     
     // Затем подключаем WebSocket
-    const ws = new WebSocket('ws://localhost:8000/ws/room');
+    let ws = null;
+    let wsConnected = false;
     
-    ws.onopen = () => {
-      console.log('WebSocket connected');
-      setWsConnected(true);
-    };
-    
-    ws.onmessage = (e) => {
+    const connectWebSocket = () => {
       try {
-        const d = JSON.parse(e.data);
-        setData(d);
-        setQuestionInfo({ current: (d.current_question || 0) + 1, total: d.question_count || 0 });
+        const wsProtocol = window.location.protocol === "https:" ? "wss" : "ws";
+        const wsHost = window.location.host;
+        const wsUrl = `${wsProtocol}://${wsHost}/ws/room`;
+        console.log('Attempting WebSocket connection to', wsUrl);
+        ws = new WebSocket(wsUrl);
+        
+        ws.onopen = () => {
+          console.log('✅ WebSocket connected successfully');
+          setWsConnected(true);
+        };
+        
+        ws.onmessage = (e) => {
+          try {
+            const d = JSON.parse(e.data);
+            console.log('📨 WebSocket message received:', d);
+            setData(d);
+            setQuestionInfo({ current: (d.current_question || 0) + 1, total: d.question_count || 0 });
+          } catch (error) {
+            console.error('❌ WebSocket message error:', error);
+          }
+        };
+        
+        ws.onerror = (error) => {
+          console.error('❌ WebSocket error:', error);
+          setWsConnected(false);
+        };
+        
+        ws.onclose = (event) => {
+          console.log('🔌 WebSocket disconnected. Code:', event.code, 'Reason:', event.reason);
+          setWsConnected(false);
+          // Пробуем переподключиться через 5 секунд
+          setTimeout(connectWebSocket, 5000);
+        };
       } catch (error) {
-        console.error('WebSocket message error:', error);
+        console.error('❌ Failed to create WebSocket:', error);
+        setWsConnected(false);
       }
     };
     
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-      setWsConnected(false);
-    };
+    connectWebSocket();
     
-    ws.onclose = () => {
-      console.log('WebSocket disconnected');
-      setWsConnected(false);
-    };
+    // Fallback: если WebSocket не работает, используем API polling каждые 5 секунд
+    const fallbackInterval = setInterval(() => {
+      if (!wsConnected) {
+        fetchData();
+      }
+    }, 5000);
     
-    return () => ws.close();
-  }, []);
-
-  // Дополнительное обновление данных каждую секунду для таймера
-  useEffect(() => {
-    const interval = setInterval(fetchData, 1000);
-    return () => clearInterval(interval);
+    return () => {
+      if (ws) {
+        ws.close();
+      }
+      clearInterval(fallbackInterval);
+    };
   }, []);
 
   useEffect(() => {

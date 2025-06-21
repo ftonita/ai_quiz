@@ -98,7 +98,7 @@ async def leaderboard():
 
 @router.get("/room/qr")
 async def get_qr():
-    url = "http://localhost:8000/api/room/register"  # обновленный URL с префиксом
+    url = "https://v386879.hosted-by-vdsina.com/"  # Главная страница приложения
     img = qrcode.make(url)
     buf = BytesIO()
     img.save(buf, format="PNG")
